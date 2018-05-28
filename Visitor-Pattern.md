@@ -115,10 +115,12 @@ class Mac extends Production {
     }
 }
 
+//策略的抽象类
 abstract class Strategy {
     abstract double discount(double price);
 }
 
+//打九折的策略
 class TenPercentDiscount extends Strategy {
     @Override
     double discount(double price) {
@@ -126,6 +128,7 @@ class TenPercentDiscount extends Strategy {
     }
 }
 
+//打八折的策略
 class TwentyPercentDiscount extends Strategy {
     @Override
     double discount(double price) {
@@ -133,6 +136,7 @@ class TwentyPercentDiscount extends Strategy {
     }
 }
 
+//环境类
 class Context{
     //可以通过配置文件的方式替换策略
     private Strategy st = new TenPercentDiscount();
@@ -163,22 +167,49 @@ class StrategyDemo{
 //折上折，第一种做法可以新增一个策略类。实现一个先打八折又打九折的情况。但这个做法如果在折扣经常会发生组合改变的情况下。可能子类会产生笛卡尔积。就是100个子类。为了避免这种情况的方法。现在重构策略类
 //把折扣类当作一个具体构件类Component，又为装饰类Decorator,折上折可以理解为折扣1装饰折扣2.
 
-class DecorateDemo {
-    public static void main(String[] args) {
-        List<Production> list = Lists.newArrayList();
-        list.add(new Phone());
-        list.add(new Pad());
-        list.add(new Mac());
-        //可以通过配置文件对方式注入替换策略，
-        NewStrategy st = new NewTenPercentDiscount(new NewTwentyPercentDiscount());
-        double count = 0;
-        for (Production production : list) {
-            count = count + st.discount(production.getPrice());
-        }
-        System.out.println("总价为：" + count);
+abstract class Production {
+    private String name;
+    private double price;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
     }
 }
 
+class Phone extends Production {
+    public Phone() {
+        setName("phone");
+        setPrice(5000);
+    }
+}
+
+class Pad extends Production {
+    public Pad() {
+        setName("pad");
+        setPrice(3000);
+    }
+}
+
+class Mac extends Production {
+    public Mac() {
+        setName("mac");
+        setPrice(9000);
+    }
+}
+
+//策略的抽象类，其中聚合一个策略类。如果策略类未包装别的策略类，则不执行父类中的discount()方法
 abstract class NewStrategy {
     private NewStrategy strategy;
     public NewStrategy() {
@@ -194,6 +225,7 @@ abstract class NewStrategy {
     }
 }
 
+//九折的策略类
 class NewTenPercentDiscount extends NewStrategy {
     public NewTenPercentDiscount() {
     }
@@ -207,6 +239,7 @@ class NewTenPercentDiscount extends NewStrategy {
     }
 }
 
+//八折的策略类
 class NewTwentyPercentDiscount extends NewStrategy {
     public NewTwentyPercentDiscount() {
     }
@@ -219,11 +252,194 @@ class NewTwentyPercentDiscount extends NewStrategy {
         return price * 0.8;
     }
 }
+
+class Context{
+    //可以通过配置文件的方式替换策略
+    private Strategy st = new NewTenPercentDiscount(new NewTwentyPercentDiscount());
+    public void checkOut(List<Production> list){
+        double count = 0;
+        for (Production production:list){
+            count = count + st.discount(production.getPrice());
+        }
+        System.out.println("总价为：" + count);
+    }
+}
+
+class DecorateDemo {
+    public static void main(String[] args) {
+        List<Production> list = Lists.newArrayList();
+        list.add(new Phone());
+        list.add(new Pad());
+        list.add(new Mac());
+        Context ctx = new Context();
+        ctx.checkOut(list); 
+    }
+}
 //使用装饰者得方式解决这个问题，避免了子类爆炸的问题，并且可以使客户端同时执行多个策略。但是缺点在于在创建策略时会变得特别的繁琐。
+//也可以不用重构策略类。直接在context中用List去保存策略。然后遍历使用所有的策略类，似乎重构context的类会更简单一些。所以有时候设计模式并不是最好的解决方案。
+class Context{
+    //可以通过配置文件的方式替换策略
+    private List<Strategy> sts = Lists.newArrayList();  //add(new TenPercentDiscount()); add(new TwentyPercentDiscount());
+    public void checkOut(List<Production> list){
+        double count = 0;
+        for (Production production:list){
+            Stirng price = production.getPrice();
+            for(Strategy st:sts){
+            price = st.discount(price);
+            }
+            count = count + price;
+        }
+        System.out.println("总价为：" + count);
+    }
+}
 ```
 
 ```java
-//某果零售店为庆祝成立30周年，将店内所有产品全部进行促销活动，其中包括(phone = 5000元、pad = 3000元、mac = 9000元)全场phone一律八折，全场Mac一律7折，全场pad一律九折
+//某果零售店为庆祝成立30周年，将店内所有产品全部进行促销活动，其中包括(phone = 5000元、pad = 3000元、mac = 9000元)全场phone一律八折，全场Mac一律7折，全场pad一律九折。由于又逢节日。店家决定全场所有的phone一律七折，全场所有的Mac一律六折，所有的pad一律八折。
 //现在请按照以上需求编写一个商品计价器。
-//考虑到固定的产品会有固定的折扣。所以这里可以将手动指定策略的方法改为由一个简单工厂动态选择策略。在简单工厂类中有个Map来存放产品名与对应折扣策略。（这部分可以指定从数据库读或者从配置文件读取）
+//由于这里每种产品要走不同的处理方式。所以如果继续延用例1的代码。则需要在context或者在执行策略前判断对应的产品然后在执行对应的策略。这样就可能会在context类中加入如下所示的if语句。而且如果每次都要修改这种产品与策略的对应关系，则就要就修改if语句中的执行条件。 
+if(name = "phone"){执行七折策略}
+else if(name = "mac"){执行六折策略}
+else if(name = "pad"){执行八折策略}
+//所以这里将每个产品对应的策略封装成一个访问者。如果当产品与策略的对应关系发生改变时只需要重写一个访问者即可。我认为访问者其实就是策略模式纵向的扩展。使其每个策略精确对应到每个具体的实现类。访问者模式与策略模式有点类似于二维数组(访问者)与一维数组(策略)的关系，这里的访问者不光可以按折扣这个纬度去增加，也可以按别的纬度去增加，例如在购买产品时需要给产品买碎屏险，Mac碎屏险1000元，phone碎屏险500元，pad碎屏险700元。只需要再添加一个访问者。然后在对应的方法中写出实现即可。
+
+//依赖一个抽象的访问者。声明一个回调访问者的accept()方法。
+//PS：如果一个A类出现在B类某个方法的 形参或者方法体中，则算是依赖关系，如果只出现在返回值类型中则两个类没有依赖关系。
+abstract class Production {
+    private String name;
+    private double price;
+
+    public abstract double accept(Visitor visitor);
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+}
+
+class Phone extends Production {
+    public Phone() {
+        setName("phone");
+        setPrice(5000);
+    }
+
+    public double accept(Visitor visitor) {
+       return visitor.visit(this);
+    }
+}
+
+class Pad extends Production {
+    public Pad() {
+        setName("pad");
+        setPrice(3000);
+    }
+
+    public double accept(Visitor visitor) {
+        return visitor.visit(this);
+    }
+}
+
+class Mac extends Production {
+    public Mac() {
+        setName("mac");
+        setPrice(9000);
+    }
+
+    public double accept(Visitor visitor) {
+       return visitor.visit(this);
+    }
+}
+
+//抽象的访问者类，声明三个重载的方法
+interface Visitor {
+    double visit(Mac mac);
+
+    double visit(Pad pad);
+
+    double visit(Phone phone);
+}
+
+//普通时期的折扣策略
+class UsualDiscountVisitor implements Visitor {
+
+    @Override
+    public double visit(Mac mac) {
+        return mac.getPrice() * 0.7;
+    }
+
+    @Override
+    public double visit(Pad pad) {
+        return pad.getPrice() * 0.9;
+    }
+
+    @Override
+    public double visit(Phone phone) {
+        return phone.getPrice() * 0.8;
+    }
+}
+
+//节日促销的折扣策略
+class HolidaySaleVisitor implements Visitor {
+
+    @Override
+    public double visit(Mac mac) {
+        return mac.getPrice() * 0.6;
+    }
+
+    @Override
+    public double visit(Pad pad) {
+        return pad.getPrice() * 0.8;
+    }
+
+    @Override
+    public double visit(Phone phone) {
+        return phone.getPrice() * 0.7;
+    }
+}
+
+//对象结构类用来保存所有的产品元素
+class ObjectStructure {
+    List<Production> list = Lists.newArrayList();
+
+    public void add(Production production) {
+        list.add(production);
+    }
+
+    public void remove(Production production) {
+        list.remove(production);
+    }
+
+    public void checkOut(Visitor visitor) {
+        double count = 0;
+        for (Production production : list) {
+            count = count + production.accept(visitor);
+        }
+        System.out.println("总价为：" + count);
+    }
+}
+
+class VisitorDemo {
+    public static void main(String[] args) {
+        //Visitor visitor = new UsualDiscountVisitor();
+        Visitor visitor = new HolidaySaleVisitor();
+        ObjectStructure os = new ObjectStructure();
+        os.add(new Phone());
+        os.add(new Pad());
+        os.add(new Mac());
+        os.checkOut(visitor);
+    }
+}
+//将访问者传入某个具体的元素，然后根据元素的类型去回调访问者中重载的方法。根据对应的形参执行对应的方法。起初我在想为什么一定要打破元素类的封装，让元素依赖访问者。ObjectStructure.checkOut()方法中如果直接用访问者的visit()方法，则需要在for循环中判断传入参数的类型。如果在元素抽象类中实现accept方法，则在回调访问者类时，会提示没有找到对应的方法。因为访问者中没有定义visit(Production pro)这样的方法。所以在写一个访问者类时一定要注意。元素的抽象类接受访问者时，只做方法声明。实现类中去回调访问者的方法。并传入this。 
+//在这个例子中。虽然解决了对新增访问者有良好的扩展。每次新增访问者只需要新写一个访问者类。但是这里由于采用了双重分派机制。则导致打破元素的封装性。而且如果当有新的元素类加入时。比如说现在新增watch产品。则每个访问者都需要在新增对watch这个元素的操作方法。这样就会导致代码大量的修改。这就是访问者模式对OCP原则的倾斜性。(抽象工厂模式中在对一套产品族[ipad,iphone,mac],[华为手机，华为平板，华为电脑]进行扩展时有良好的扩展方案。如果在产品族中新增某个产品种类[ipad,iphone,mac,watch]。则每个抽象工厂的实现类都需要增加对新产品的创建方法。这就是抽象工厂和访问者模式相似的地方，同时都是一类去依赖了多个类，导致出现OCP的倾斜)访问者作为23中设计模式中公认最难的模式。在使用它的时候一定要考虑如果元素种类发生变化的概率极地。并且对一类元素有着多种操作的时候再使用。
 ```
